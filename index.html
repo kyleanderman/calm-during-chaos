@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Calm During Chaos">
-  <link rel="manifest" href="manifest.json?v=daynav-v11">
-  <link rel="apple-touch-icon" href="icon-180.png?v=daynav-v11">
+  <link rel="manifest" href="manifest.json?v=daychip-v12">
+  <link rel="apple-touch-icon" href="icon-180.png?v=daychip-v12">
   <title>Calm During Chaos</title>
   <style>
     html,body{margin:0;background:#07090e;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
@@ -29,7 +29,7 @@
   const ORIGINAL='cdc-v3-rescue-original-v9';
   const LATEST='cdc-v3-rescue-latest-v9';
   const REPAIRED='cdc-v3-rescue-repaired-v9';
-  const CACHE_MARK='cdc-cache-reset-v11';
+  const CACHE_MARK='cdc-cache-reset-v12';
   const DATA_CACHE='cdc-data-rescue-v9';
   const RESCUE_DB='cdc-rescue-v9';
   const pad=n=>String(n).padStart(2,'0');
@@ -212,7 +212,7 @@
 
     const files=['app-part-1.txt','app-part-2.txt','app-part-3.txt'];
     const stamp=Date.now();
-    const chunks=await Promise.all(files.map(f=>fetch(f+'?v=daynav-v11-'+stamp,{cache:'no-store'}).then(r=>{
+    const chunks=await Promise.all(files.map(f=>fetch(f+'?v=daychip-v12-'+stamp,{cache:'no-store'}).then(r=>{
       if(!r.ok)throw new Error('Could not load app');
       return r.text();
     })));
@@ -221,32 +221,34 @@
     if(!('DecompressionStream'in window))throw new Error('Please update Safari');
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
+    html=html
+      .replace(/60[\s‐‑‒–—-]+DAY[\s‐‑‒–—-]+RESET/g,'60-DAY JOURNEY')
+      .replace(/60[\s‐‑‒–—-]+day[\s‐‑‒–—-]+reset/gi,'60-day journey');
+
     const navStyle=`<style id="cdc-day-nav-style">
-#cdc-day-nav{position:sticky;top:0;z-index:2147483646;background:rgba(7,9,14,.96);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);padding:calc(env(safe-area-inset-top) + 8px) 14px 9px;border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 5px 18px rgba(0,0,0,.22)}
-#cdc-day-nav-inner{max-width:640px;margin:0 auto;display:grid;grid-template-columns:52px 1fr 52px;gap:10px;align-items:center}
-#cdc-day-nav button{height:42px;border:1px solid rgba(255,255,255,.12);border-radius:13px;background:#151b25;color:#fff;font-size:30px;line-height:1;font-weight:500;padding:0 0 4px;touch-action:manipulation}
-#cdc-day-nav button:active:not(:disabled){transform:scale(.96);background:#202938}
-#cdc-day-nav button:disabled{opacity:.22}
-#cdc-day-nav-center{text-align:center;min-width:0}
-#cdc-day-nav-title{font-size:17px;font-weight:900;letter-spacing:.075em;white-space:nowrap}
-#cdc-day-nav-date{font-size:11px;color:#8e9aae;font-weight:700;letter-spacing:.08em;margin-top:2px;white-space:nowrap}
+[data-cdc-day-toggle="1"]{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.cdc-day-nav-arrow{display:inline-flex;align-items:center;justify-content:center;width:27px;height:27px;margin:0 4px;border:1px solid rgba(255,255,255,.13);border-radius:8px;background:rgba(255,255,255,.055);color:inherit;font:inherit;font-size:20px;line-height:1;padding:0 0 2px;vertical-align:middle;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.cdc-day-nav-arrow:active:not(:disabled){transform:scale(.94);background:rgba(255,255,255,.11)}
+.cdc-day-nav-arrow:disabled{opacity:.2;cursor:default}
 </style>`;
 
     const navCode=`(()=>{try{
 if(typeof S==='undefined'||typeof render!=='function'||typeof todayISO!=='function'||typeof addDays!=='function')return;
 if(S.start!=='2026-08-23'){S.start='2026-08-23';if(typeof save==='function')save()}
 const start='2026-08-23';
-const isoToDate=x=>new Date(x+'T12:00:00');
-const dayNum=x=>Math.round((isoToDate(x)-isoToDate(start))/86400000)+1;
-const pretty=x=>isoToDate(x).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
+let open=false,dayEl=null,timer=null;
+const clean=x=>(x||'').trim().replace(/\\s+/g,' ');
+const isDayText=t=>/^DAY\\s+\\d+\\s+(?:OF|OUT OF)\\s+60$/i.test(clean(t));
+const findDayEl=()=>{const els=[...document.querySelectorAll('body *')];return els.find(el=>!el.classList.contains('cdc-day-nav-arrow')&&isDayText(el.textContent)&&![...el.children].some(ch=>isDayText(ch.textContent)))||null};
+const clearArrows=()=>document.querySelectorAll('.cdc-day-nav-arrow').forEach(x=>x.remove());
 const clamp=()=>{const today=todayISO();if(selected<start)selected=start;if(selected>today)selected=today};
-const sync=()=>{clamp();const bar=document.getElementById('cdc-day-nav');if(!bar)return;const today=todayISO(),n=Math.max(1,Math.min(60,dayNum(selected)));bar.querySelector('#cdc-day-nav-title').textContent='DAY '+n+' OF 60';bar.querySelector('#cdc-day-nav-date').textContent=pretty(selected)+(selected===today?' · TODAY':' · EDITING PAST DAY');bar.querySelector('#cdc-prev-day').disabled=selected<=start;bar.querySelector('#cdc-next-day').disabled=selected>=today};
-const mount=()=>{if(!document.body)return;if(!document.getElementById('cdc-day-nav')){const bar=document.createElement('div');bar.id='cdc-day-nav';bar.innerHTML='<div id="cdc-day-nav-inner"><button id="cdc-prev-day" type="button" aria-label="Previous day">‹</button><div id="cdc-day-nav-center"><div id="cdc-day-nav-title"></div><div id="cdc-day-nav-date"></div></div><button id="cdc-next-day" type="button" aria-label="Next day">›</button></div>';document.body.insertAdjacentElement('afterbegin',bar);bar.querySelector('#cdc-prev-day').addEventListener('click',()=>go(-1));bar.querySelector('#cdc-next-day').addEventListener('click',()=>go(1))}sync()};
-const go=dir=>{const target=addDays(selected,dir),today=todayISO();if(target<start||target>today)return;selected=target;render();setTimeout(()=>{mount();window.scrollTo({top:0,behavior:'smooth'})},0)};
-clamp();mount();
-const obs=new MutationObserver(()=>{if(!document.getElementById('cdc-day-nav'))setTimeout(mount,0);else sync()});
-obs.observe(document.body,{childList:true,subtree:false});
-}catch(e){console.error('Day navigation',e)}})();`;
+const go=dir=>{const target=addDays(selected,dir),today=todayISO();if(target<start||target>today)return;selected=target;render();setTimeout(bind,0)};
+const showArrows=()=>{clearArrows();if(!open||!dayEl||!dayEl.isConnected)return;const today=todayISO();const left=document.createElement('button'),right=document.createElement('button');left.type=right.type='button';left.className=right.className='cdc-day-nav-arrow';left.textContent='‹';right.textContent='›';left.setAttribute('aria-label','Previous day');right.setAttribute('aria-label','Next day');left.disabled=selected<=start;right.disabled=selected>=today;left.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go(-1)});right.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go(1)});dayEl.insertAdjacentElement('beforebegin',left);dayEl.insertAdjacentElement('afterend',right)};
+const bind=()=>{clamp();const found=findDayEl();if(!found){clearArrows();return}dayEl=found;if(dayEl.dataset.cdcDayToggle!=='1'){dayEl.dataset.cdcDayToggle='1';dayEl.setAttribute('role','button');dayEl.setAttribute('aria-label','Change day');dayEl.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();open=!open;showArrows()})}showArrows()};
+document.addEventListener('click',e=>{if(open&&!e.target.closest('[data-cdc-day-toggle="1"],.cdc-day-nav-arrow')){open=false;clearArrows()}},true);
+const obs=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(bind,0)});obs.observe(document.body,{childList:true,subtree:true,characterData:true});
+clamp();bind();
+}catch(e){console.error('Inline day navigation',e)}})();`;
 
     html=html.replace('</head>',navStyle+'</head>');
     const navScript='<scr'+'ipt>'+navCode+'</scr'+'ipt>';
