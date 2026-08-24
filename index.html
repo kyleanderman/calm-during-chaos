@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Calm During Chaos">
-  <link rel="manifest" href="manifest.json?v=daychip-v13">
-  <link rel="apple-touch-icon" href="icon-180.png?v=daychip-v13">
+  <link rel="manifest" href="manifest.json?v=daypill-v14">
+  <link rel="apple-touch-icon" href="icon-180.png?v=daypill-v14">
   <title>Calm During Chaos</title>
   <style>
     html,body{margin:0;background:#07090e;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
@@ -18,243 +18,123 @@
   </style>
 </head>
 <body>
-<div id="loading"><div>Calm During Chaos<small>Restoring Day 1 safely and opening Day 2...</small></div></div>
+<div id="loading"><div>Calm During Chaos<small>Opening your journey...</small></div></div>
 <script>
 (async()=>{
   const KEY='cdc-v3';
   const DAY1='2026-08-23';
   const EARLY='2026-08-22';
   const NEXT='2026-08-24';
-  const MARK='cdc-day2-repair-v9';
-  const ORIGINAL='cdc-v3-rescue-original-v9';
-  const LATEST='cdc-v3-rescue-latest-v9';
-  const REPAIRED='cdc-v3-rescue-repaired-v9';
-  const CACHE_MARK='cdc-cache-reset-v13';
-  const DATA_CACHE='cdc-data-rescue-v9';
-  const RESCUE_DB='cdc-rescue-v9';
-  const pad=n=>String(n).padStart(2,'0');
-  const localISO=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const has=v=>v!==null&&v!==undefined&&v!=='';
-  const hasContent=v=>!!v&&typeof v==='object'&&Object.keys(v).length>0;
-
-  const mergeMoved=(target={},source={})=>{
-    const out={...target};
-    for(const [k,v] of Object.entries(source||{})){
-      const cur=out[k];
-      if(k==='drinks'||k==='pornMastCount') out[k]=(Number(cur)||0)+(Number(v)||0);
-      else if(k==='customNeg'||k==='customPos'||k==='checkins') out[k]={...(v||{}),...(cur||{})};
-      else if(['mood','clarity','calm','energy','xanax'].includes(k)){if(!has(cur)&&has(v))out[k]=v;}
-      else if(typeof v==='boolean') out[k]=Boolean(cur||v);
-      else if(Array.isArray(v)){if(!Array.isArray(cur)||!cur.length)out[k]=v;}
-      else if(v&&typeof v==='object'&&cur&&typeof cur==='object'&&!Array.isArray(cur)) out[k]={...v,...cur};
-      else if(!has(cur)&&has(v)) out[k]=v;
-    }
-    return out;
-  };
-
-  const overlayCurrent=(backup={},current={})=>{
-    const out={...backup};
-    for(const [k,v] of Object.entries(current||{})){
-      const base=out[k];
-      if(k==='customNeg'||k==='customPos'||k==='checkins') out[k]={...(base||{}),...(v||{})};
-      else if(typeof v==='boolean') out[k]=Boolean(base||v);
-      else if(Array.isArray(v)) out[k]=v.length?v:(Array.isArray(base)?base:v);
-      else if(v&&typeof v==='object'&&base&&typeof base==='object'&&!Array.isArray(v)) out[k]={...base,...v};
-      else if(has(v)) out[k]=v;
-    }
-    return out;
-  };
-
-  const idbPut=(raw,name)=>new Promise(resolve=>{
-    try{
-      const q=indexedDB.open(RESCUE_DB,1);
-      q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains('backups'))q.result.createObjectStore('backups');};
-      q.onerror=()=>resolve();
-      q.onsuccess=()=>{
-        const db=q.result;
-        try{
-          const tx=db.transaction('backups','readwrite');
-          tx.objectStore('backups').put(raw,name);
-          tx.oncomplete=()=>{db.close();resolve();};
-          tx.onerror=()=>{db.close();resolve();};
-        }catch(e){db.close();resolve();}
-      };
-    }catch(e){resolve();}
-  });
-
-  const idbGet=(dbName,name)=>new Promise(resolve=>{
-    try{
-      const q=indexedDB.open(dbName,1);
-      q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains('backups'))q.result.createObjectStore('backups');};
-      q.onerror=()=>resolve(null);
-      q.onsuccess=()=>{
-        const db=q.result;
-        try{
-          const tx=db.transaction('backups','readonly');
-          const r=tx.objectStore('backups').get(name);
-          r.onsuccess=()=>{db.close();resolve(r.result||null);};
-          r.onerror=()=>{db.close();resolve(null);};
-        }catch(e){db.close();resolve(null);}
-      };
-    }catch(e){resolve(null);}
-  });
-
-  const cachePut=async(raw,name)=>{
-    try{
-      if(!('caches'in window))return;
-      const c=await caches.open(DATA_CACHE);
-      await c.put('./__'+name+'.json',new Response(raw,{headers:{'Content-Type':'application/json','Cache-Control':'no-store'}}));
-    }catch(e){}
-  };
-
-  const cacheGet=async(cacheName,name)=>{
-    try{
-      if(!('caches'in window))return null;
-      const c=await caches.open(cacheName);
-      const r=await c.match('./__'+name+'.json');
-      return r?await r.text():null;
-    }catch(e){return null;}
-  };
-
-  const normalizeCandidate=obj=>{
-    const c=JSON.parse(JSON.stringify(obj||{}));
-    c.days=c.days||{};
-    c.health=c.health||{};
-    const start=c.start;
-    const move=(from)=>{
-      if(c.days[from]){c.days[DAY1]=mergeMoved(c.days[DAY1]||{},c.days[from]);delete c.days[from];}
-      if(c.health[from]){c.health[DAY1]={...c.health[from],...(c.health[DAY1]||{})};delete c.health[from];}
-    };
-    if(EARLY!==DAY1) move(EARLY);
-    if(start===NEXT&&!hasContent(c.days[DAY1])&&!hasContent(c.health[DAY1])) move(NEXT);
-    c.start=DAY1;
-    return c;
-  };
-
-  const scoreCandidate=c=>{
-    try{return JSON.stringify(c.days?.[DAY1]||{}).length+JSON.stringify(c.health?.[DAY1]||{}).length;}
-    catch(e){return 0;}
-  };
+  const MARK='cdc-native-daypill-v14';
+  const CACHE_MARK='cdc-cache-reset-v14';
 
   try{
-    let raw=null;
-    try{
-      raw=localStorage.getItem(KEY);
-      if(raw){
-        if(!localStorage.getItem(ORIGINAL))localStorage.setItem(ORIGINAL,raw);
-        localStorage.setItem(LATEST,raw);
-        localStorage.setItem('cdc-v3-rescue-meta-v9',JSON.stringify({savedAt:new Date().toISOString(),localDate:localISO(),bytes:raw.length}));
-        await idbPut(raw,'original');
-        await cachePut(raw,'original');
+    const raw=localStorage.getItem(KEY);
+    if(raw){
+      try{
+        if(!localStorage.getItem('cdc-v3-rescue-original-v14')) localStorage.setItem('cdc-v3-rescue-original-v14',raw);
+        localStorage.setItem('cdc-v3-rescue-latest-v14',raw);
+        localStorage.setItem('cdc-v3-rescue-meta-v14',JSON.stringify({savedAt:new Date().toISOString(),bytes:raw.length}));
+      }catch(e){}
+
+      if(!localStorage.getItem(MARK)){
+        try{
+          const s=JSON.parse(raw);
+          s.days=s.days||{};
+          s.health=s.health||{};
+          const hasDay1=Object.keys(s.days[DAY1]||{}).length||Object.keys(s.health[DAY1]||{}).length;
+          const move=(from)=>{
+            if(s.days[from]&&!hasDay1){s.days[DAY1]=s.days[from];delete s.days[from];}
+            if(s.health[from]&&!hasDay1){s.health[DAY1]=s.health[from];delete s.health[from];}
+          };
+          if(s.start===EARLY){move(EARLY);s.start=DAY1;}
+          if(s.start===NEXT&&!hasDay1){move(NEXT);s.start=DAY1;}
+          localStorage.setItem(KEY,JSON.stringify(s));
+          localStorage.setItem(MARK,'1');
+        }catch(e){}
       }
-    }catch(e){console.error('Data backup',e);}
+    }
 
     try{
-      if(raw&&!localStorage.getItem(MARK)){
-        const s=JSON.parse(raw);
-        s.days=s.days||{};
-        s.health=s.health||{};
-        const originalStart=s.start;
-        const hadDay1Before=hasContent(s.days[DAY1])||hasContent(s.health[DAY1]);
-        const moved=[];
-        const moveDate=d=>{
-          let changed=false;
-          if(s.days[d]){s.days[DAY1]=mergeMoved(s.days[DAY1]||{},s.days[d]);delete s.days[d];changed=true;}
-          if(s.health[d]){s.health[DAY1]={...s.health[d],...(s.health[DAY1]||{})};delete s.health[d];changed=true;}
-          if(changed)moved.push(d);
-        };
-
-        moveDate(EARLY);
-        if(originalStart===NEXT&&!hadDay1Before)moveDate(NEXT);
-
-        const priorRaws=[
-          localStorage.getItem('cdc-v3-rescue-original-v8'),
-          localStorage.getItem('cdc-v3-rescue-repaired-v8'),
-          localStorage.getItem('cdc-v3-rescue-latest-v8'),
-          await idbGet('cdc-rescue-v8','original'),
-          await idbGet('cdc-rescue-v8','repaired'),
-          await cacheGet('cdc-data-rescue-v8','original'),
-          await cacheGet('cdc-data-rescue-v8','repaired')
-        ].filter(Boolean);
-
-        let best=null,bestScore=0;
-        for(const candidateRaw of priorRaws){
-          try{
-            const candidate=normalizeCandidate(JSON.parse(candidateRaw));
-            const score=scoreCandidate(candidate);
-            if(score>bestScore){best=candidate;bestScore=score;}
-          }catch(e){}
-        }
-
-        if(best&&bestScore>0){
-          if(hasContent(best.days?.[DAY1])) s.days[DAY1]=overlayCurrent(best.days[DAY1],s.days[DAY1]||{});
-          if(hasContent(best.health?.[DAY1])) s.health[DAY1]={...best.health[DAY1],...(s.health[DAY1]||{})};
-        }
-
-        s.start=DAY1;
-        const fixed=JSON.stringify(s);
-        localStorage.setItem(KEY,fixed);
-        localStorage.setItem(REPAIRED,fixed);
-        localStorage.setItem(MARK,JSON.stringify({repairedAt:new Date().toISOString(),localDate:localISO(),moved,recoveredPriorBackup:Boolean(best&&bestScore>0)}));
-        await idbPut(fixed,'repaired');
-        await cachePut(fixed,'repaired');
-        raw=fixed;
-      }
-    }catch(e){console.error('Day 2 repair',e);}
-
-    try{
-      if('caches'in window&&!localStorage.getItem(CACHE_MARK)){
+      if('caches' in window&&!localStorage.getItem(CACHE_MARK)){
         const keys=await caches.keys();
-        await Promise.all(keys.filter(k=>k!==DATA_CACHE&&!k.startsWith('cdc-data-rescue-')).map(k=>caches.delete(k)));
+        await Promise.all(keys.filter(k=>!k.startsWith('cdc-data-rescue-')).map(k=>caches.delete(k)));
         localStorage.setItem(CACHE_MARK,'1');
       }
     }catch(e){}
 
-    const files=['app-part-1.txt','app-part-2.txt','app-part-3.txt'];
     const stamp=Date.now();
-    const chunks=await Promise.all(files.map(f=>fetch(f+'?v=daychip-v13-'+stamp,{cache:'no-store'}).then(r=>{
-      if(!r.ok)throw new Error('Could not load app');
-      return r.text();
-    })));
-    const b64=chunks.join('').replace(/\s/g,'');
+    const parts=await Promise.all(['app-part-1.txt','app-part-2.txt','app-part-3.txt'].map(f=>
+      fetch(f+'?v=daypill-v14-'+stamp,{cache:'no-store'}).then(r=>{
+        if(!r.ok) throw new Error('Could not load app');
+        return r.text();
+      })
+    ));
+
+    const b64=parts.join('').replace(/\s/g,'');
     const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
-    if(!('DecompressionStream'in window))throw new Error('Please update Safari');
+    if(!('DecompressionStream' in window)) throw new Error('Please update Safari');
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
-    html=html
-      .replace(/60[\s‐‑‒–—-]+DAY[\s‐‑‒–—-]+RESET/g,'60-DAY JOURNEY')
-      .replace(/60[\s‐‑‒–—-]+day[\s‐‑‒–—-]+reset/gi,'60-day journey');
+    html=html.replace('60-DAY RESET','60-DAY JOURNEY');
 
-    const navStyle=`<style id="cdc-day-nav-style">
-.cdc-day-nav-arrow{position:fixed;z-index:2147483647;display:flex;align-items:center;justify-content:center;width:29px;height:29px;border:1px solid rgba(255,255,255,.14);border-radius:9px;background:rgba(18,23,32,.96);color:#fff;font-size:21px;font-weight:700;line-height:1;padding:0 0 2px;box-shadow:0 4px 12px rgba(0,0,0,.28);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-.cdc-day-nav-arrow:active:not(:disabled){transform:scale(.94);background:rgba(35,43,56,.98)}
-.cdc-day-nav-arrow:disabled{opacity:.22;cursor:default}
+    const css=`<style id="cdc-native-daypill-style">
+#daypill{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#cdcDayNav{position:fixed;z-index:2147483647;display:none;gap:7px;padding:6px;border:1px solid rgba(255,255,255,.14);border-radius:13px;background:rgba(13,21,34,.98);box-shadow:0 10px 26px rgba(0,0,0,.45)}
+#cdcDayNav.on{display:flex}
+#cdcDayNav button{width:36px;height:34px;border:1px solid rgba(255,255,255,.14);border-radius:9px;background:#182334;color:#f2f7ff;font-size:25px;font-weight:750;line-height:1;padding:0 0 3px;display:grid;place-items:center;touch-action:manipulation}
+#cdcDayNav button:active:not(:disabled){background:#25354d;transform:scale(.96)}
+#cdcDayNav button:disabled{opacity:.22}
 </style>`;
 
-    const navCode=`(()=>{try{
-if(typeof S==='undefined'||typeof render!=='function'||typeof todayISO!=='function'||typeof addDays!=='function')return;
-if(S.start!=='2026-08-23'){S.start='2026-08-23';if(typeof save==='function')save()}
-const start='2026-08-23';
-let open=false,anchor=null,timer=null;
-const clean=x=>(x||'').replace(/\\s+/g,' ').trim();
-const visible=el=>{if(!el||el===document.body||el===document.documentElement)return false;const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&r.top<240&&r.bottom>0&&s.display!=='none'&&s.visibility!=='hidden'};
-const dayish=el=>{if(!visible(el))return false;const t=clean(el.textContent),r=el.getBoundingClientRect();return /DAY/i.test(t)&&/60/.test(t)&&/\\d/.test(t)&&t.length<=80&&r.width<=280&&r.height<=80};
-const fromTarget=target=>{let el=target&&target.nodeType===1?target:target?.parentElement;for(let i=0;el&&i<8;i++,el=el.parentElement){if(dayish(el))return el}return null};
-const findDay=()=>{const hits=[...document.querySelectorAll('body *')].filter(dayish);hits.sort((a,b)=>{const ta=clean(a.textContent).length,tb=clean(b.textContent).length;if(ta!==tb)return ta-tb;const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();return ar.width*ar.height-br.width*br.height});return hits[0]||null};
-const clearArrows=()=>document.querySelectorAll('.cdc-day-nav-arrow').forEach(x=>x.remove());
-const clamp=()=>{const today=todayISO();if(selected<start)selected=start;if(selected>today)selected=today};
-const position=()=>{if(!open)return;anchor=anchor&&anchor.isConnected&&dayish(anchor)?anchor:findDay();if(!anchor){clearArrows();return}let left=document.getElementById('cdc-prev-day-float'),right=document.getElementById('cdc-next-day-float');if(!left||!right)return;const r=anchor.getBoundingClientRect(),size=29,gap=5,top=Math.max(4,Math.round(r.top+(r.height-size)/2));left.style.top=right.style.top=top+'px';left.style.left=Math.max(4,Math.round(r.left-size-gap))+'px';right.style.left=Math.min(innerWidth-size-4,Math.round(r.right+gap))+'px'};
-const show=()=>{clearArrows();if(!open)return;anchor=anchor&&anchor.isConnected&&dayish(anchor)?anchor:findDay();if(!anchor)return;const today=todayISO(),left=document.createElement('button'),right=document.createElement('button');left.id='cdc-prev-day-float';right.id='cdc-next-day-float';left.type=right.type='button';left.className=right.className='cdc-day-nav-arrow';left.textContent='‹';right.textContent='›';left.setAttribute('aria-label','Previous day');right.setAttribute('aria-label','Next day');left.disabled=selected<=start;right.disabled=selected>=today;left.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go(-1)});right.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go(1)});document.body.append(left,right);position()};
-const go=dir=>{const target=addDays(selected,dir),today=todayISO();if(target<start||target>today)return;selected=target;render();setTimeout(()=>{anchor=findDay();show()},0)};
-document.addEventListener('click',e=>{if(e.target.closest?.('.cdc-day-nav-arrow'))return;const hit=fromTarget(e.target);if(hit){e.preventDefault();e.stopPropagation();anchor=hit;open=!open;show();return}if(open){open=false;anchor=null;clearArrows()}},true);
-const obs=new MutationObserver(()=>{if(!open)return;clearTimeout(timer);timer=setTimeout(()=>{anchor=findDay();show()},0)});obs.observe(document.body,{childList:true,subtree:true,characterData:true});
-addEventListener('resize',position);addEventListener('scroll',position,{passive:true});
-clamp();
-}catch(e){console.error('Inline day navigation',e)}})();`;
+    const code=`(()=>{try{
+const pill=document.getElementById('daypill');
+if(!pill||typeof selected==='undefined'||typeof render!=='function'||typeof addDays!=='function'||typeof todayISO!=='function'||typeof S==='undefined')return;
+let open=false;
+const nav=document.createElement('div');
+nav.id='cdcDayNav';
+nav.innerHTML='<button id="cdcPrevDay" type="button" aria-label="Previous day">‹</button><button id="cdcNextDay" type="button" aria-label="Next day">›</button>';
+document.body.appendChild(nav);
+const prev=nav.querySelector('#cdcPrevDay'),next=nav.querySelector('#cdcNextDay');
 
-    html=html.replace('</head>',navStyle+'</head>');
-    const navScript='<scr'+'ipt>'+navCode+'</scr'+'ipt>';
-    html=html.replace('</body>',navScript+'</body>');
+const update=()=>{
+  const today=todayISO();
+  prev.disabled=!S.start||selected<=S.start;
+  next.disabled=!S.start||selected>=today;
+  const r=pill.getBoundingClientRect(),w=nav.offsetWidth||85;
+  nav.style.left=Math.max(8,Math.min(innerWidth-w-8,r.right-w))+'px';
+  nav.style.top=Math.min(innerHeight-50,r.bottom+6)+'px';
+};
+
+const setOpen=value=>{
+  open=!!value&&!!S.start;
+  nav.classList.toggle('on',open);
+  if(open) requestAnimationFrame(update);
+};
+
+const go=delta=>{
+  if(!S.start)return;
+  const target=addDays(selected,delta),today=todayISO();
+  if(target<S.start||target>today)return;
+  selected=target;
+  render();
+  setOpen(true);
+};
+
+pill.addEventListener('click',e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  setOpen(!open);
+});
+prev.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go(-1)});
+next.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go(1)});
+document.addEventListener('click',e=>{if(open&&!e.target.closest('#daypill,#cdcDayNav'))setOpen(false)});
+addEventListener('resize',()=>{if(open)update()});
+addEventListener('scroll',()=>{if(open)update()},{passive:true});
+}catch(e){console.error('Native day pill navigation',e)}})();`;
+
+    html=html.replace('</head>',css+'</head>');
+    html=html.replace('</body>','<scr'+'ipt>'+code+'</scr'+'ipt></body>');
     document.open();
     document.write(html);
     document.close();
