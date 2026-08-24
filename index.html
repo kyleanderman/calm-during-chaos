@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Calm During Chaos">
-  <link rel="manifest" href="manifest.json?v=day2-v9">
-  <link rel="apple-touch-icon" href="icon-180.png?v=day2-v9">
+  <link rel="manifest" href="manifest.json?v=daynav-v10">
+  <link rel="apple-touch-icon" href="icon-180.png?v=daynav-v10">
   <title>Calm During Chaos</title>
   <style>
     html,body{margin:0;background:#07090e;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
@@ -212,7 +212,7 @@
 
     const files=['app-part-1.txt','app-part-2.txt','app-part-3.txt'];
     const stamp=Date.now();
-    const chunks=await Promise.all(files.map(f=>fetch(f+'?v=day2-v9-'+stamp,{cache:'no-store'}).then(r=>{
+    const chunks=await Promise.all(files.map(f=>fetch(f+'?v=daynav-v10-'+stamp,{cache:'no-store'}).then(r=>{
       if(!r.ok)throw new Error('Could not load app');
       return r.text();
     })));
@@ -220,8 +220,37 @@
     const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
     if(!('DecompressionStream'in window))throw new Error('Please update Safari');
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
-    const align=`<script>(()=>{try{if(typeof S!=='undefined'){let changed=false;if(S.start!=='2026-08-23'){S.start='2026-08-23';changed=true}if(typeof todayISO==='function'){selected=todayISO()}if(changed&&typeof save==='function')save();if(typeof render==='function')render()}}catch(e){console.error('Day 2 alignment',e)}})();<\/script>`;
-    html=html.replace('</body>',align+'</body>');
+    const enhancement=`<style id="cdc-day-nav-style">
+#cdc-day-nav{position:sticky;top:0;z-index:2147483646;background:rgba(7,9,14,.96);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);padding:calc(env(safe-area-inset-top) + 8px) 14px 9px;border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 5px 18px rgba(0,0,0,.22)}
+#cdc-day-nav-inner{max-width:640px;margin:0 auto;display:grid;grid-template-columns:52px 1fr 52px;gap:10px;align-items:center}
+#cdc-day-nav button{height:42px;border:1px solid rgba(255,255,255,.12);border-radius:13px;background:#151b25;color:#fff;font-size:30px;line-height:1;font-weight:500;padding:0 0 4px;touch-action:manipulation}
+#cdc-day-nav button:active:not(:disabled){transform:scale(.96);background:#202938}
+#cdc-day-nav button:disabled{opacity:.22}
+#cdc-day-nav-center{text-align:center;min-width:0}
+#cdc-day-nav-title{font-size:17px;font-weight:900;letter-spacing:.075em;white-space:nowrap}
+#cdc-day-nav-date{font-size:11px;color:#8e9aae;font-weight:700;letter-spacing:.08em;margin-top:2px;white-space:nowrap}
+</style>
+<script>(()=>{try{
+if(typeof S==='undefined'||typeof render!=='function'||typeof todayISO!=='function'||typeof addDays!=='function')return;
+if(S.start!=='2026-08-23'){S.start='2026-08-23';if(typeof save==='function')save()}
+const start='2026-08-23';
+const isoToDate=x=>new Date(x+'T12:00:00');
+const dayNum=x=>Math.round((isoToDate(x)-isoToDate(start))/86400000)+1;
+const pretty=x=>isoToDate(x).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
+const clamp=()=>{const today=todayISO();if(selected<start)selected=start;if(selected>today)selected=today};
+clamp();
+const bar=document.createElement('div');bar.id='cdc-day-nav';
+bar.innerHTML='<div id="cdc-day-nav-inner"><button id="cdc-prev-day" type="button" aria-label="Previous day">‹</button><div id="cdc-day-nav-center"><div id="cdc-day-nav-title"></div><div id="cdc-day-nav-date"></div></div><button id="cdc-next-day" type="button" aria-label="Next day">›</button></div>';
+document.body.insertAdjacentElement('afterbegin',bar);
+const title=bar.querySelector('#cdc-day-nav-title'),date=bar.querySelector('#cdc-day-nav-date'),prev=bar.querySelector('#cdc-prev-day'),next=bar.querySelector('#cdc-next-day');
+const sync=()=>{clamp();const today=todayISO(),n=Math.max(1,Math.min(60,dayNum(selected)));title.textContent='DAY '+n+' OF 60';date.textContent=pretty(selected)+(selected===today?' · TODAY':' · EDITING PAST DAY');prev.disabled=selected<=start;next.disabled=selected>=today};
+const go=dir=>{const target=addDays(selected,dir),today=todayISO();if(target<start||target>today)return;selected=target;render();sync();window.scrollTo({top:0,behavior:'smooth'})};
+prev.addEventListener('click',()=>go(-1));next.addEventListener('click',()=>go(1));
+render();sync();
+}catch(e){console.error('Day navigation',e)}})();<\/script>`;
+    html=html.replace('</head>',enhancement.split('<script>')[0]+'</head>');
+    const navScript='<script>'+enhancement.split('<script>')[1];
+    html=html.replace('</body>',navScript+'</body>');
     document.open();
     document.write(html);
     document.close();
