@@ -1,4 +1,4 @@
-const CACHE='calm-during-chaos-localdate-fix-2';
+const CACHE='calm-during-chaos-day1-clean-v3';
 const ASSETS=['./','./index.html','./manifest.json','./app-part-1.txt','./app-part-2.txt','./app-part-3.txt'];
 self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
