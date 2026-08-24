@@ -1,7 +1,7 @@
 {
   "name": "Calm During Chaos",
   "short_name": "Calm",
-  "description": "A 60-day personal reset tracker.",
+  "description": "A 60-day personal journey tracker.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
